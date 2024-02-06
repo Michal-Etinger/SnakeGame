@@ -1,96 +1,61 @@
-from snake import Snake
-from food import Food
-from send_message import Message
-import turtle
+import turtle    #יבוא של סיפרייה חיצונית טורטל
 
-class Display:
-    def __init__(self, setup, title, bgimage, tracer):
-        self.screen = turtle.Screen()
-        self.screen.setup(*setup)
-        self.screen.title(title)
-        self.screen.bgpic(bgimage)
-        self.screen.tracer(tracer)
 
-class Scoreboard(turtle.Turtle):
-    def __init__(self):
-        super().__init__()
-        self.score = 0
-        self.color("white")
-        self.penup()
-        self.hideturtle()
-        self.goto(0, 260)
-        self.update_score()
-
-    def update_score(self):
-        self.clear()
-        self.write(f"Score: {self.score}", align="center", font=("Courier", 24, "normal"))
-
-    def increase_score(self):
-        self.score += 1
-        self.update_score()
-
-    def game_over(self):
-        self.goto(0, 0)
-        self.write("Game Over", align="center", font=("Courier", 36, "normal"))
-
-class Game(Display):
-    def __init__(self, snake , food, display , scoreboard, delay):
-        self.delay = delay
+class Game():      #(הכלה) מחלקת המשחק עצמו המכילה את כל יתר המחלקות 
+    def __init__(self, snake , food , scoreboard, delay, display, send_message):  #אתחול של המשחק
+        self.display = display  
+        self.delay = delay    
         self.snake = snake
         self.food = food
-        self.display = display
         self.scoreboard = scoreboard
-
-        self.message = "Message"
-        self.number = "+972527256247"
-        self.send_message = Message(self.message, self.number)
-
+        self.send_message = send_message
     
-        
-        
-    def after_move_snake(self):
-        self.snake.clearstamps()
-        for segment in self.snake.current_location:
-            self.snake.goto(segment[0], segment[1])
-            self.snake.stamp()
-        self.display.screen.update()
-        turtle.ontimer(self.move_snake, self.delay)
-        self.scoreboard.update_score()  # Update the score after each move
 
-    def screen_listen(self):
-        self.display.screen.listen()
-        self.display.screen.onkey(self.snake.go_up, "Up")
+    def reset(self):      #אתחול המשחק
+        self.screen_listen()    #אתחול והגדרת הקשבה למקשים
+        self.food.reset()       #אתחול המיקום של האוכל
+        self.move_snake()       #התזוזה של הנחש
+        
+    def screen_listen(self):    #אתחול והגדרה של הקשבה למקשים
+        self.display.screen.listen()    #מעכשיו תקשיב למקשים
+        self.display.screen.onkey(self.snake.go_up, "Up")    #בעת לחיצת על כפתור אפ הפעל את גואפ של האובייקט של הנחש
         self.display.screen.onkey(self.snake.go_right, "Right")
         self.display.screen.onkey(self.snake.go_down, "Down")
         self.display.screen.onkey(self.snake.go_left, "Left")
 
-    def reset(self):
-        self.screen_listen()
-        self.food.reset()
-        self.move_snake()
+    def move_snake(self):       #תזוזת הנחש
+        eat_itself = self.snake.move()     #בנה את הראש החדש
+        if eat_itself:      #במידה ואכלנו את עצמו
+            self.snake.reset()         #נאתחל את הנחש
+            self.send_message.edit_message(f"Congrats your score is {self.scoreboard.score}")   #מעדכנים את ההודעה בווטצאפ
+            self.send_message.send()     #שולחים את ההודעה
+            self.scoreboard.score = 0    #מאפסים את ההניקוד
+            self.after_move_snake()      # קוראים למתודה בהמשך להמשך הפעולות
+        else:                    #במקרה והוא לא אכל את עצמו
+            if not self.food_collision():   #האם הוא לא אכל אוכל
+                self.snake.chop_tail()      #תמחק את הזנב
+            self.after_move_snake()         #קוראים למתודה בהמשך להמשך הפעולות
+            
+    def after_move_snake(self):      #מתודת עדכון המסך לאחר תזוזת הנחש
+        self.snake.clearstamps()        #מתודה שירשנו מטורטל שאחראית למחיקת שארית הנחש מהמסך אחרי שהוא זז
+        for segment in self.snake.current_location:   #עבור כל גוף של הנחש תצייר על המסך במיקום איקס וואי
+            self.snake.goto(segment[0], segment[1])   #הקורדינטות של כל סגמנט
+            self.snake.stamp()      #תקבע את מה שציירנו לאחר תזוזת הנחש
+        self.display.screen.update()          #ביצענו שינויים, תעדכן את השינויים על גבי המסך
+        turtle.ontimer(self.move_snake, self.delay)    #לקרוא למתודה בעוד זמן מסויים
+        self.scoreboard.update_score()      #לבצע עדכון ללוח התוצאות
 
-    def move_snake(self):
-        eat_itself = self.snake.move()  
-        if eat_itself:
-            self.snake.reset()
-            self.send_message.edit_message(f"Congrats your score is {self.scoreboard.score}")
-            self.send_message.send()
-            self.scoreboard.score = 0
-            self.after_move_snake()
-        else:
-            if not self.food_collision():
-                self.snake.chop_tail()
-            self.after_move_snake()
-
-    def get_distance(self, pos1, pos2):
+    def get_distance(self, pos1, pos2):     #מתודה כללית לצורך אומדן מרחק
         x1, y1 = pos1
         x2, y2 = pos2
-        distance = ((y2 - y1) ** 2 + (x2 - x1) ** 2) ** 0.5
+        distance = ((y2 - y1) ** 2 + (x2 - x1) ** 2) ** 0.5   #פיתגורס
         return distance
 
-    def food_collision(self):
-        if self.get_distance(self.snake.current_location[-1], self.food.position) < 20:
-            self.food.reset()
-            self.scoreboard.increase_score()  # Increase score when snake eats food
+    def food_collision(self):        #בדיקת המרחק בין הראש לאוכל - האם הראש נכנס קרוב לאוכל
+        if self.get_distance(self.snake.current_location[-1], self.food.position) < 20:     #אם המרחק בין הראש לאוכל קטן מ-20
+            self.food.reset()        #אתחול מיקום האוכל
+            self.scoreboard.increase_score()      #הגדלת לוח התוצאות עקב אכילת האוכל
             return True
         return False
+
+
